@@ -31,7 +31,7 @@ By William Cook
 Author of "The Practical Poultry Breeder and Feeder";
 "The Horse: its keep and management";
 "Pheasants, Turkeys, and Geese: their management for pleasure and profit"
-"""
+""".strip()
 
 chapter_1 = """
 ## Introduction
@@ -39,7 +39,7 @@ chapter_1 = """
 Not so many years ago roast duck was a luxury only for the rich, unless it 
 might have been a few foreign birds sent into our markets, which could 
 usually be bought up at a very low price. 
-"""
+""".strip()
 
 doc = Doc.from_md(main_content)
 
