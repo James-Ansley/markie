@@ -1,0 +1,7 @@
+Doc(metadata={'title': 'All About Envelopes', 'src': 'https://en.wikipedia.org/wiki/Windowed_envelope'},
+    preamble='',
+    sections=[Section(level=2,
+                      title='Envelopes',
+                      preamble='Satisfactorily-strong envelopes for business and general-purpose domestic\n'
+                               'correspondence can be, and are, in fact, made out of paper of various qualities.',
+                      subsections=[])])

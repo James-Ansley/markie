@@ -1,0 +1,7 @@
+---
+title: The main paragraph
+---
+
+The original text
+
+The appended/prepended text

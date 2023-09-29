@@ -1,0 +1,18 @@
+Doc(metadata={},
+    preamble='Welcome to the grand opening of Fromagerie Bessette. Or\n'
+             "as it's more commonly known by the residents of small-town Providence,\n"
+             'Ohio-the Cheese Shop. Proprietor Charlotte Bessette has prepared a delightful\n'
+             'sampling of bold Cabot Clothbound Cheddar, delicious tortes of Stilton and\n'
+             'Mascarpone, and a taste of Sauvignon Blanc-but someone else has decided to\n'
+             'make a little crime of passion the piece de resistance. Right outside the\n'
+             'shop Charlotte finds a body, the victim stabbed to death with one of her\n'
+             'prized olive-wood handled knives.',
+    sections=[Section(level=1,
+                      title='Chapter 1',
+                      preamble='"I\'m not dead, Charlotte," Grandpère Etienne said.\\\n'
+                               '"But you are retired, Pépère. I tweaked his rosy cheek and skirted around him\n'
+                               'to throw a drop cloth over the rustic wooden table that usually held wheels\n'
+                               'of cheese, like Abbaye de Belloc, Manchego, and Humboldt Fog, the latter\n'
+                               'cheese a great pairing with chardonnay. Dust billowed up as the edges of the\n'
+                               'drop cloth hit the shop floor.',
+                      subsections=[])])

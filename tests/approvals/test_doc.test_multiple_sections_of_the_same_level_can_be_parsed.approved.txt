@@ -1,0 +1,10 @@
+Doc(metadata={},
+    preamble='',
+    sections=[Section(level=2,
+                      title='Heading Number 1',
+                      preamble='Content for heading number 1',
+                      subsections=[]),
+              Section(level=2,
+                      title='Heading Number 2',
+                      preamble='Content for heading number 2',
+                      subsections=[])])

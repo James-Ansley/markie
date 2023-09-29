@@ -1,0 +1,10 @@
+Doc(metadata={'title': 'Chromatic Fantasy',
+              'year': 1979,
+              'composer': 'Barbara Kolb',
+              'attributions': 'text by: Howard Stern'},
+    preamble='The text is divided into three parts which all interrelate.',
+    sections=[Section(level=2,
+                      title='Part 1',
+                      preamble='The young woman at the next table is wearing a long purple dress,\n'
+                               'and I consider inviting her to join me for lunch.',
+                      subsections=[])])

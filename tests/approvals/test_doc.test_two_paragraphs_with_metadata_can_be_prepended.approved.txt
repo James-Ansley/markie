@@ -1,0 +1,3 @@
+Doc(metadata={'title': 'The main paragraph'},
+    preamble='The appended/prepended text\n\nThe original text',
+    sections=[])

@@ -77,9 +77,8 @@ class Section:
         """
         Sets the title of this section – the value string should be inline
         markdown.
-        Be Warned — This function does prevent the title from being
-        set to something other than this; however, the behaviour of this
-        class will then undefined.
+        Be Warned — This function does not prevent the title from being
+        set to non-inline text — behaviour is undefined if it is.
         """
         _, content, _ = MD.parse(value)
         self.heading[1] = content
@@ -102,8 +101,10 @@ class Section:
         else:
             sections[-1].last().preamble.extend(self.preamble)
             self.preamble = preamble
-            while self.subsections and self.subsections[0].level > sections[
-                -1].level:
+            while (
+                  self.subsections
+                  and self.subsections[0].level > sections[-1].level
+            ):
                 current = sections[-1]
                 while self.subsections[0].level - 1 > current.level:
                     current = current.subsections[-1]
@@ -141,6 +142,10 @@ class Section:
             return self.subsections[-1].last()
         else:
             return self
+
+    def render(self) -> str:
+        """Renders this section as markdown"""
+        return RENDERER.render([*self], OPTIONS, {})
 
     def __iter__(self) -> Iterator[Token]:
         """

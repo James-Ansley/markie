@@ -46,7 +46,7 @@ doc = Doc.from_md(main_content)
 # content can be appended with .append, or prepended with .prepend
 doc.append(chapter_1)
 
-# Metadata can be retried and set
+# Metadata can be retrieved and set
 doc.metadata["authors"] = ["William Cook"]
 
 # can be pretty printed to quickly gleam the overall document structure
