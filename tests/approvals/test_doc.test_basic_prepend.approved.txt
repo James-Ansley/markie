@@ -1,0 +1,13 @@
+Doc(metadata={'tag1': 'Hello', 'tag2': 5},
+    preamble='New Preamble',
+    sections=[Section(level=1,
+                      title='An H1 Tag',
+                      preamble='H1 Preamble\n\nOriginal Preamble',
+                      subsections=[Section(level=2,
+                                           title='Subheading 1',
+                                           preamble='Subheading 1 Text',
+                                           subsections=[]),
+                                   Section(level=2,
+                                           title='Subheading 2',
+                                           preamble='Subheading 2 Text',
+                                           subsections=[])])])

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "markie"
-version = "0.0.1.alpha1"
+version = "0.0.1.alpha2"
 description = "Small package for easily processing markdown files"
 
 readme = "README.md"

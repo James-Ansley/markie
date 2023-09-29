@@ -1,5 +1,6 @@
-from collections.abc import Iterator, Mapping, Sequence
-from typing import Any, Self
+from collections.abc import Iterable, Iterator, MutableMapping, Sequence
+from pprint import PrettyPrinter
+from typing import Self
 
 import mdformat_footnote
 import mdformat_frontmatter
@@ -11,8 +12,10 @@ from mdformat.renderer import MDRenderer
 from mdit_py_plugins.footnote import footnote_plugin
 from mdit_py_plugins.front_matter import front_matter_plugin
 
-from markie.rules import render_rules
-from markie.rules.parsing_rules import wikilink_plugin
+from markie.rules import render_rules, wikilink_plugin
+from markie.utils import generic_repr
+
+__all__ = ["Doc", "Section"]
 
 MD = (
     MarkdownIt('commonmark', {'breaks': True, 'html': True})
@@ -32,169 +35,317 @@ OPTIONS = {
     ],
 }
 
-HEADING_LEVELS = {
-    "h1": 1,
-    "h2": 2,
-    "h3": 3,
-    "h4": 4,
-    "h5": 5,
-    "h6": 6,
-}
+StrMap = MutableMapping[str, "str | bool | int | float | StrMap"]
+
+HEADING_LEVELS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
 
 
-def parse_src(src: str) -> tuple[Mapping[str, Any], list[Token]]:
-    tokens = MD.parse(src)
-    return parse_tokens(tokens)
+class Section:
+    """
+    A markdown section – This is mostly an ordered tree wrapper around a
+    list of Tokens.
+    """
 
+    def __init__(
+          self,
+          heading: list[Token],
+          preamble: list[Token] = None,
+          subsections: list["Section"] = None,
+    ):
+        """
+        :param heading: three markdown-it Tokens for a parsed heading tag
+        :param preamble: a list of tokens between the heading title and the
+            first subsection
+        :param subsections: a list of this section's Sub-subsections
+        """
+        self.heading = heading
+        self.preamble = preamble if preamble is not None else []
+        self.subsections = subsections if subsections is not None else []
 
-def parse_tokens(tokens: Sequence[Token]):
-    if tokens[0].type == "front_matter":
-        frontmatter, *tokens = tokens
-        frontmatter = yaml.safe_load(frontmatter.content)
-    else:
-        frontmatter = {}
-    return frontmatter, tokens
+    @property
+    def level(self) -> int:
+        """The level of this section (i.e. 1-6 corresponding to h1-h6)"""
+        return HEADING_LEVELS[self.heading[0].tag]
+
+    @property
+    def title(self) -> str:
+        """The raw unformatted title text of this section"""
+        return self.heading[1].content
+
+    @title.setter
+    def title(self, value: str) -> None:
+        """
+        Sets the title of this section – the value string should be inline
+        markdown.
+        Be Warned — This function does prevent the title from being
+        set to something other than this; however, the behaviour of this
+        class will then undefined.
+        """
+        _, content, _ = MD.parse(value)
+        self.heading[1] = content
+
+    def prepend(self, src: "str | Section") -> None:
+        """
+        Prepends the given markdown string or Section to this Section,
+        attempting to maintain a tree-like Section structure.
+        Metadata in the given src string is ignored.
+
+        :param src: A string of Markdown text or a Section object
+        """
+        if isinstance(src, str):
+            _, preamble, sections = parse(MD.parse(src))
+        else:
+            preamble, sections = [], [src]
+
+        if not sections:
+            self.preamble = [*preamble, *self.preamble]
+        else:
+            sections[-1].last().preamble.extend(self.preamble)
+            self.preamble = preamble
+            while self.subsections and self.subsections[0].level > sections[
+                -1].level:
+                current = sections[-1]
+                while self.subsections[0].level - 1 > current.level:
+                    current = current.subsections[-1]
+                current.subsections.append(self.subsections.pop(0))
+            self.subsections = [*sections, *self.subsections]
+
+    def append(self, src: "str | Section"):
+        """
+        Appends the given markdown string or Section to this Section,
+        attempting to maintain a tree-like Section structure.
+        Metadata in the given src string is ignored.
+
+        :param src: A string of Markdown text or a Section object
+        """
+        if isinstance(src, str):
+            _, preamble, sections = parse(MD.parse(src))
+        else:
+            preamble, sections = [], [src]
+
+        if not self.subsections:
+            self.preamble.extend(preamble)
+            self.subsections = sections
+        else:
+            self.subsections[-1].last().preamble.extend(preamble)
+            while sections and self.subsections[-1].level < sections[0].level:
+                current = self.subsections[-1]
+                while sections[0].level - 1 > current.level:
+                    current = current.subsections[-1]
+                current.subsections.append(sections.pop(0))
+            self.subsections = [*self.subsections, *sections]
+
+    def last(self) -> "Section":
+        """Returns the last ("rightmost") leaf node in the section tree"""
+        if self.subsections:
+            return self.subsections[-1].last()
+        else:
+            return self
+
+    def __iter__(self) -> Iterator[Token]:
+        """
+        Iterates over the tokens in this section and its subsections in order
+        """
+        yield from self.heading
+        yield from self.preamble
+        for subsection in self.subsections:
+            yield from subsection
+
+    def __repr__(self):
+        return generic_repr(self)
 
 
 class Doc:
-    def __init__(self, metadata, content):
+    """
+    A Markdown document with metadata.
+
+    Parses Markdown text into metadata, a preamble, and Sections. Doc objects
+    attempt to parse sections into a tree like-structure; however,
+    this assumes markdown is "well formatted" with sections following a
+    natural order (i.e. h1 -> h2 -> h3). This class does not prevent users
+    from breaking this order, but its behaviour in such cases is undefined.
+
+    Elements in the Doc preamble, and Sections consist of markdown-it Tokens
+    and can be manipulated directly.
+    """
+
+    def __init__(
+          self,
+          metadata: StrMap,
+          preamble: list[Token],
+          sections: list[Section]
+    ):
+        """
+        :param metadata: a mapping of markdown metadata
+        :param preamble: a list of markdown-it Tokens that appear between the
+            metadata and first heading
+        :param sections: the document sections as an AST
+        """
         self.metadata = metadata
-        self._content: list[Token] = list(content)
+        self.preamble = preamble
+        self.sections = sections
 
     @classmethod
     def from_md(cls, src: str) -> Self:
         """
         Parses the given markdown src string and returns a new Doc.
 
-        :param src: a string of markdown
+        :param src: A string of markdown
         """
-        frontmatter, tokens = parse_src(src)
-        return cls(frontmatter, tokens)
+        tokens = MD.parse(src)
+        return cls.from_tokens(tokens)
 
     @classmethod
     def from_tokens(cls, src: Sequence[Token]) -> Self:
         """
         Creates a new Doc from a sequence of markdown-it tokens
 
-        :param src: a sequence of markdown-it tokens
+        :param src: A sequence of markdown-it tokens
         """
-        frontmatter, tokens = parse_tokens(src)
-        return cls(frontmatter, tokens)
+        frontmatter, preamble, sections = parse(src)
+        return cls(frontmatter, preamble, sections)
 
-    def prepend(self, src: str):
+    def prepend(self, src: str) -> None:
         """
-        Adds the given content to the start of this Markdown doc. Ignores any
-        metadata in the given src string.
-        """
-        metadata, tokens = parse_src(src)
-        self._content = [*tokens, *self._content]
+        Prepends the given src markdown to this document, attempting to
+        maintain a tree-like Section structure. Any metadata in the given src
+        string is ignored
 
-    def append(self, src: str):
+        :param src: The Markdown src string
         """
-        Adds the given content to the end of this Markdown doc. Ignores any
-        metadata in the given src string.
-        """
-        _, tokens = parse_src(src)
-        self._content.extend(tokens)
+        _, preamble, sections = parse(MD.parse(src))
+        if not sections:
+            self.preamble = [*preamble, *self.preamble]
+        else:
+            sections[-1].last().preamble.extend(self.preamble)
+            self.preamble = preamble
+            while self.sections and self.sections[0].level > sections[-1].level:
+                sections[-1].append(self.sections.pop(0))
+            self.sections = [*sections, *self.sections]
 
-    def append_to_section(self, src: str, title: str, level: str):
+    def append(self, src: str) -> None:
         """
-        Finds the first section with the given title and level and adds the
-        given content to the end of that section
+        Appends the given Markdown src string to this document, attempting to
+        maintain a tree-like Section structure. Any metadata in the given src
+        string is ignored
 
-        :param src: the markdown string to add
-        :param title: the tile of the section to append to
-        :param level: the level of the heading to find
+        :param src: The Markdown src string
         """
-        _, idx = self._section(title, level)
-        _, tokens = parse_src(src)
-        self._content[idx:idx] = tokens
-
-    def prepend_to_section(self, src: str, title: str, level: str):
-        """
-        Finds the first section with the given title and level and adds the
-        given content to the start of that section
-
-        :param src: the markdown string to add
-        :param title: the tile of the section to prepend to
-        :param level: the level of the heading to find
-        """
-        idx, _ = self._section(title, level)
-        _, tokens = parse_src(src)
-        self._content[idx:idx] = tokens
-
-    def replace_section(self, src: str, title: str, level: str):
-        """
-        Finds the first section with the given title and level and replaces that
-        section's content with the given markdown.
-        (The section heading is preserved)
-
-        :param src: the markdown string
-        :param title: the tile of the section to replace
-        :param level: the level of the heading to find
-        """
-        s, e = self._section(title, level)
-        _, tokens = parse_src(src)
-        self._content[s:e] = tokens
-
-    def _section(self, title: str, level: str) -> tuple[int, int]:
-        """
-        Returns the start and end indices of the given section content
-
-        :param title: the title of the section to find
-        :param level: the section level
-        """
-        it = self._tokens_of_type("heading_open")
-        start = next(
-            i for i, t in it
-            if t.tag == level and self._content[i + 1].content == title
-        )
-        end, _ = next(it, (len(self._content), None))
-        return start + 3, end
-
-    def _tokens_of_type(
-          self, *ttypes: str, start: int = 0
-    ) -> Iterator[tuple[int, Token]]:
-        """
-        Iterates over tokens of the given type(s)
-
-        :param ttypes: the types of tokens
-        :param start: the index to start searching from
-        :returns: an iterator that iterates over the indices and tokens that
-            match the given criteria
-        """
-        for i in range(start, len(self._content)):
-            token = self._content[i]
-            if token.type in ttypes:
-                yield i, token
+        _, preamble, sections = parse(MD.parse(src))
+        if not self.sections:
+            self.preamble.extend(preamble)
+            self.sections = sections
+        else:
+            self.sections[-1].last().preamble.extend(preamble)
+            while sections and self.sections[-1].level < sections[0].level:
+                self.sections[-1].append(sections.pop(0))
+            self.sections = [*self.sections, *sections]
 
     def render(self) -> str:
         """Renders this doc as markdown"""
         if self.metadata:
-            frontmatter = Token(
-                type='front_matter',
-                tag='',
-                nesting=0,
-                content=yaml.safe_dump(self.metadata, sort_keys=False),
-                markup='---',
-                block=True,
-                hidden=True
-            )
-            tokens = [frontmatter, *self._content]
+            frontmatter = as_frontmatter(self.metadata)
+            return RENDERER.render([frontmatter, *self], OPTIONS, {})
         else:
-            tokens = self._content
-        return RENDERER.render(tokens, OPTIONS, {})
+            return RENDERER.render(list(self), OPTIONS, {})
 
-    def __add__(self, other: "Doc") -> "Doc":
-        """
-        Combines this doc with another – only includes metadata from this doc
-        and not other
-        """
-        return Doc(self.metadata, self._content + other._content)
+    def __iter__(self) -> Iterator[Token]:
+        """Iterates over the Tokens of this document in order"""
+        yield from self.preamble
+        for section in self.sections:
+            yield from section
 
-    def __iadd__(self, other: "Doc"):
-        """
-        Appends the content from other to this – ignores metadata from other.
-        """
-        self._content += other._content
-        return self
+    def __repr__(self):
+        return generic_repr(self)
+
+
+def parse(src: Iterable[Token]) -> tuple[StrMap, list[Token], list[Section]]:
+    """
+    Parses a markdown-it Token stream to metadata, a preamble, and
+    nested Sections
+
+    :param src: An Iterable of markdown-it Tokens
+    :return: a tuple of the metadata, preamble, and Section tree in that order.
+    """
+    metadata = {}
+    preamble = []
+    stack = []
+    tokens = iter(src)
+    for token in tokens:
+        if token.type == "front_matter":
+            metadata = yaml.safe_load(token.content)
+        elif token.type == "heading_open":
+            level = HEADING_LEVELS[token.tag]
+            while (len(stack) > 1
+                   and level <= stack[-1].level
+                   and stack[-2].level < stack[-1].level):
+                stack[-2].subsections.append(stack.pop())
+            heading = [token, next(tokens), next(tokens)]
+            stack.append(Section(heading))
+        elif stack:
+            stack[-1].preamble.append(token)
+        else:
+            preamble.append(token)
+    while len(stack) > 1 and stack[-2].level < stack[-1].level:
+        stack[-2].subsections.append(stack.pop())
+    return metadata, preamble, stack
+
+
+def as_frontmatter(metadata: StrMap) -> Token:
+    """Maps frontmatter data to a markdown-it Token"""
+    return Token(
+        type='front_matter',
+        tag='',
+        nesting=0,
+        content=yaml.safe_dump(metadata, sort_keys=False),
+        markup='---',
+        block=True,
+        hidden=True
+    )
+
+
+def render(tokens: Sequence[Token]):
+    """Shortcut to render with default options"""
+    return RENDERER.render(tokens, OPTIONS, {})
+
+
+# noinspection PyUnresolvedReferences,PyProtectedMember,PyMethodMayBeStatic
+class _DocPrettyPrinter(PrettyPrinter):
+    """
+    Pretty printer for Doc and Section objects.
+
+    Note: The output of this pretty printer is used in approval tests to
+    check Markdown document structure.
+    """
+
+    def _pprint_doc(self, obj, stream, indent, *args):
+        stream.write(f"Doc(")
+        indent += 4
+        stream.write(f"metadata=")
+        self._format(obj.metadata, stream, indent + 9, *args)
+        stream.write(f",\n{' ' * indent}preamble=")
+        preamble = render(obj.preamble).strip()
+        self._format(preamble, stream, indent + 9, *args)
+        stream.write(f",\n{' ' * indent}sections=")
+        self._format(obj.sections, stream, indent + 9, *args)
+        indent -= 4
+        stream.write(f")")
+
+    def _pprint_section(self, obj, stream, indent, *args):
+        stream.write(f"Section(")
+        indent += 8
+        stream.write(f"level=")
+        self._format(obj.level, stream, indent + 6, *args)
+        stream.write(f",\n{' ' * indent}title=")
+        heading = obj.title.strip()
+        self._format(heading, stream, indent + 6, *args)
+        stream.write(f",\n{' ' * indent}preamble=")
+        preamble = render(obj.preamble).strip()
+        self._format(preamble, stream, indent + 9, *args)
+        stream.write(f",\n{' ' * indent}subsections=")
+        self._format(obj.subsections, stream, indent + 12, *args)
+        indent -= 8
+        stream.write(f")")
+
+    PrettyPrinter._dispatch[Doc.__repr__] = _pprint_doc
+    PrettyPrinter._dispatch[Section.__repr__] = _pprint_section
