@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "markie"
-version = "0.0.1.alpha2"
+version = "0.0.1.alpha3"
 description = "Small package for easily processing markdown files"
 
 readme = "README.md"
@@ -26,12 +26,3 @@ dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-# [project.scripts]
-# markie = "markie:__main__"
-#
-# [tool.setuptools]
-# include-package-data = true
-#
-# [tool.setuptools.package-data]
-# "*" = ["*.xml", "*.json"]

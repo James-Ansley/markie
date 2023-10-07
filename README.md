@@ -49,7 +49,7 @@ doc.append(chapter_1)
 # Metadata can be retrieved and set
 doc.metadata["authors"] = ["William Cook"]
 
-# can be pretty printed to quickly gleam the overall document structure
+# can be pretty printed to quickly glean the overall document structure
 pprint(doc)
 
 # Iterating over docs yields markdown-it tokens in order

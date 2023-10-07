@@ -1,0 +1,4 @@
+Section(level=1,
+        title='A Completely New Title!',
+        preamble='The purpose of this book is to help problem solvers improve their street smarts.',
+        subsections=[])

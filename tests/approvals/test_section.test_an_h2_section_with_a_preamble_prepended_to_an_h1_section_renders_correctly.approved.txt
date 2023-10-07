@@ -1,0 +1,9 @@
+# An H1 Section
+
+Some preamble before Section 2
+
+## An H2 Section
+
+H2 section body
+
+H1 section body

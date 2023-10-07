@@ -1,0 +1,7 @@
+Section(level=1,
+        title='An H1 Section',
+        preamble='H1 section body\n\nSome preamble before Section 2',
+        subsections=[Section(level=2,
+                             title='An H2 Section',
+                             preamble='H2 section body',
+                             subsections=[])])

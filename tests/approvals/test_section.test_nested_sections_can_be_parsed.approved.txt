@@ -1,0 +1,11 @@
+Section(level=2,
+        title='Heading 1',
+        preamble='Content for heading number 1',
+        subsections=[Section(level=3,
+                             title='Heading 1-1',
+                             preamble='Content for heading number 1-1',
+                             subsections=[]),
+                     Section(level=3,
+                             title='Heading 1-2',
+                             preamble='Content for heading number 1-2',
+                             subsections=[])])

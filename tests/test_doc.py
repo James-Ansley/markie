@@ -1,5 +1,3 @@
-# noinspection PyPep8
-
 from pprint import pformat
 
 from approvaltests import verify

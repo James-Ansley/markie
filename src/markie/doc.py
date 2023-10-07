@@ -62,6 +62,36 @@ class Section:
         self.preamble = preamble if preamble is not None else []
         self.subsections = subsections if subsections is not None else []
 
+    @classmethod
+    def from_md(cls, src: str) -> Self:
+        """
+        Parses the given markdown src string and returns a new Section.
+
+        :param src: A string of markdown
+        :raises ValueError: If the given markdown has multiple headings with
+            the lowest heading level (e.g. two h2 headings) or if the given
+            markdown contains a preamble
+        """
+        tokens = MD.parse(src)
+        return cls.from_tokens(tokens)
+
+    @classmethod
+    def from_tokens(cls, src: Sequence[Token]) -> Self:
+        """
+        Creates a new Section from a sequence of markdown-it tokens
+
+        :param src: A sequence of markdown-it tokens
+        :raises ValueError: If the given markdown has multiple headings with
+            the lowest heading level (e.g. two h2 headings) or if the given
+            markdown contains a preamble
+        """
+        _, preamble, sections = parse(src)
+        if len(sections) != 1 or preamble:
+            raise ValueError(
+                "The given markdown does not consist of a single section"
+            )
+        return sections[0]
+
     @property
     def level(self) -> int:
         """The level of this section (i.e. 1-6 corresponding to h1-h6)"""
@@ -85,9 +115,13 @@ class Section:
 
     def prepend(self, src: "str | Section") -> None:
         """
-        Prepends the given markdown string or Section to this Section,
+        Prepends the given markdown string or Section *inside* this Section,
         attempting to maintain a tree-like Section structure.
         Metadata in the given src string is ignored.
+
+        Note: this function does not prevent nonsensical operations such as
+        prepending an H1 section inside an H2 section — the behaviour of this
+        class is undefined in such cases.
 
         :param src: A string of Markdown text or a Section object
         """
@@ -106,16 +140,23 @@ class Section:
                   and self.subsections[0].level > sections[-1].level
             ):
                 current = sections[-1]
-                while self.subsections[0].level - 1 > current.level:
+                while (
+                      current.subsections
+                      and self.subsections[0].level - 1 > current.level
+                ):
                     current = current.subsections[-1]
                 current.subsections.append(self.subsections.pop(0))
             self.subsections = [*sections, *self.subsections]
 
-    def append(self, src: "str | Section"):
+    def append(self, src: "str | Section") -> None:
         """
         Appends the given markdown string or Section to this Section,
         attempting to maintain a tree-like Section structure.
         Metadata in the given src string is ignored.
+
+        Note: this function does not prevent nonsensical operations such as
+        appending an H1 section inside an H2 section — the behaviour of this
+        class is undefined in such cases.
 
         :param src: A string of Markdown text or a Section object
         """
@@ -137,7 +178,7 @@ class Section:
             self.subsections = [*self.subsections, *sections]
 
     def last(self) -> "Section":
-        """Returns the last ("rightmost") leaf node in the section tree"""
+        """Returns the last ("rightmost") node in the section tree"""
         if self.subsections:
             return self.subsections[-1].last()
         else:
@@ -305,7 +346,7 @@ def as_frontmatter(metadata: StrMap) -> Token:
         content=yaml.safe_dump(metadata, sort_keys=False),
         markup='---',
         block=True,
-        hidden=True
+        hidden=True,
     )
 
 
@@ -333,7 +374,6 @@ class _DocPrettyPrinter(PrettyPrinter):
         self._format(preamble, stream, indent + 9, *args)
         stream.write(f",\n{' ' * indent}sections=")
         self._format(obj.sections, stream, indent + 9, *args)
-        indent -= 4
         stream.write(f")")
 
     def _pprint_section(self, obj, stream, indent, *args):
@@ -349,7 +389,6 @@ class _DocPrettyPrinter(PrettyPrinter):
         self._format(preamble, stream, indent + 9, *args)
         stream.write(f",\n{' ' * indent}subsections=")
         self._format(obj.subsections, stream, indent + 12, *args)
-        indent -= 8
         stream.write(f")")
 
     PrettyPrinter._dispatch[Doc.__repr__] = _pprint_doc
